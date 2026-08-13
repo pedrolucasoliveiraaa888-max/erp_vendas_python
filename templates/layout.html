@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ERP Multi-Loja</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex">
+
+  <!-- SIDEBAR / MENU LATERAL -->
+  <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 min-h-screen">
+    <!-- BRANDING -->
+    <div class="p-5 border-b border-slate-800 flex items-center gap-3">
+      <div class="w-9 h-9 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-center text-emerald-400 font-bold text-lg">
+        E
+      </div>
+      <div>
+        <h1 class="font-bold text-white text-sm tracking-tight leading-none">ERP Vendas</h1>
+        <span class="text-[10px] text-slate-400 font-medium">PDV & Gestão 100% Local</span>
+      </div>
+    </div>
+
+    <!-- SELETOR DE LOJAS (ADMIN) -->
+    {% if user and user.role == 'ADMIN' and stores %}
+    <div class="p-3 border-b border-slate-800">
+      <label class="block text-[10px] text-slate-400 font-bold mb-1">LOJA SELECIONADA:</label>
+      <select onchange="window.location.href='?store_id=' + this.value" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-emerald-400 font-bold focus:outline-none">
+        {% for s in stores %}
+        <option value="{{ s.id }}" {% if s.id == selected_store_id %}selected{% endif %}>🏢 {{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <!-- ITENS DO MENU -->
+    <nav class="flex-1 p-3 space-y-1 overflow-y-auto text-xs font-semibold">
+      <a href="/dashboard?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        📊 Dashboard
+      </a>
+      
+      <a href="/pdv?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        🛒 PDV / Caixa
+      </a>
+
+      <a href="/products?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        📦 Produtos
+      </a>
+
+      <a href="/customers?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        👥 Clientes & WhatsApp
+      </a>
+
+      <a href="/receivables?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        📄 Contas a Receber
+      </a>
+
+      <!-- BOTÃO DE IMPORTAÇÃO DE INFORMAÇÕES (PDF/XML) -->
+      <a href="/import-pdf?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white font-bold transition-all">
+        📥 Importar Informações / PDF
+      </a>
+
+      <a href="/reports?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        📈 Relatórios de Vendas
+      </a>
+
+      {% if user and user.role == 'ADMIN' %}
+      <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-500 font-bold px-3 uppercase">Administração</div>
+      <a href="/stores?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        🏢 Lojas
+      </a>
+      <a href="/users?store_id={{ selected_store_id }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        👤 Usuários
+      </a>
+      {% endif %}
+    </nav>
+
+    <!-- USUÁRIO LOGADO & LOGOUT -->
+    <div class="p-4 border-t border-slate-800 flex items-center justify-between text-xs">
+      <div>
+        <p class="font-bold text-white">{{ user.name if user else 'Usuário' }}</p>
+        <span class="text-[10px] text-emerald-400 font-mono">{{ user.role if user else 'VENDEDOR' }}</span>
+      </div>
+      <a href="/logout" class="text-rose-400 hover:underline text-xs">Sair 🚪</a>
+    </div>
+  </aside>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="flex-1 p-6 overflow-y-auto">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

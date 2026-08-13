@@ -1,0 +1,297 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="h-full flex flex-col space-y-4">
+  <div class="flex items-center justify-between">
+    <h2 class="text-xl font-bold text-white">🛒 Frente de Caixa / PDV</h2>
+    <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-xl font-bold">
+      Loja: {{ current_store.name }}
+    </span>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+    
+    <!-- LADO ESQUERDO: CATÁLOGO DE PRODUTOS E BUSCA -->
+    <div class="lg:col-span-7 flex flex-col space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex gap-3">
+        <input type="text" id="search_input" placeholder="🔍 Buscar produto por nome ou código..." onkeyup="filterProducts()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+      </div>
+
+      <!-- GRID DE PRODUTOS -->
+      <div id="products_grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto max-h-[600px] p-1">
+        {% for p in products %}
+        <div onclick="addToCart({{ p.id }}, '{{ p.name }}', {{ p.sale_price }}, {{ p.stock_quantity }})" class="product-card bg-slate-900 border border-slate-800 hover:border-emerald-500 p-3 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] space-y-2 relative group" data-name="{{ p.name|lower }}" data-code="{{ p.code|lower }}">
+          <div class="h-28 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center relative">
+            {% if p.photo_url %}
+            <img src="{{ p.photo_url }}" alt="{{ p.name }}" class="w-full h-full object-cover">
+            {% else %}
+            <span class="text-3xl">📦</span>
+            {% endif %}
+            <span class="absolute top-2 right-2 text-[10px] bg-slate-900/80 text-emerald-400 px-2 py-0.5 rounded-md font-bold font-mono border border-slate-700">
+              Est: {{ p.stock_quantity }}
+            </span>
+          </div>
+
+          <div>
+            <h4 class="font-bold text-xs text-white truncate">{{ p.name }}</h4>
+            <p class="text-[10px] text-slate-400 font-mono">{{ p.code }}</p>
+            <p class="text-sm font-black text-emerald-400 mt-1">R$ {{ "%.2f"|format(p.sale_price) }}</p>
+          </div>
+        </div>
+        {% else %}
+        <div class="col-span-full text-center py-12 text-slate-500 text-xs">
+          Nenhum produto cadastrado nesta loja.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- LADO DIREITO: CARRINHO DE COMPRAS E FINALIZAÇÃO -->
+    <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+      <div>
+        <h3 class="font-bold text-sm text-indigo-400 mb-3 flex items-center justify-between">
+          <span>🛒 Carrinho de Compras</span>
+          <button onclick="clearCart()" class="text-xs text-rose-400 hover:underline font-normal">Limpar</button>
+        </h3>
+
+        <!-- LISTA DOS ITENS NO CARRINHO -->
+        <div id="cart_items" class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+          <div class="text-center py-12 text-slate-500 text-xs">
+            Carrinho vazio. Clique nos produtos ao lado para adicionar.
+          </div>
+        </div>
+      </div>
+
+      <!-- SELEÇÃO DE CLIENTE, DESCONTO E FORMA DE PAGAMENTO -->
+      <div class="space-y-3 pt-4 border-t border-slate-800">
+        <div>
+          <label class="block text-[11px] text-slate-400 font-bold mb-1">Cliente:</label>
+          <select id="customer_select" onchange="updateCustomerPhone()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-bold">
+            <option value="Cliente Avulso" data-phone="">Cliente Avulso</option>
+            {% for c in customers %}
+            <option value="{{ c.name }}" data-phone="{{ c.phone or '' }}">{{ c.name }} ({{ c.phone or 'Sem Tel' }})</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" id="customer_phone" value="">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-slate-400 font-bold mb-1">Forma de Pagamento:</label>
+            <select id="payment_method" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-bold">
+              <option value="DINHEIRO">💵 Dinheiro</option>
+              <option value="PIX">⚡ PIX</option>
+              <option value="CARTÃO DE CRÉDITO">💳 Cartão Crédito</option>
+              <option value="CARTÃO DE DÉBITO">💳 Cartão Débito</option>
+              <option value="CREDIARIO">📄 Promissória / Fiado</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 font-bold mb-1">Desconto (R$):</label>
+            <input type="number" id="discount_input" value="0" min="0" step="0.5" onchange="renderCart()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-emerald-400 font-bold font-mono">
+          </div>
+        </div>
+
+        <!-- RESUMO DE VALORES -->
+        <div class="bg-slate-950 p-4 rounded-xl space-y-1 font-mono">
+          <div class="flex justify-between text-xs text-slate-400">
+            <span>Subtotal:</span>
+            <span id="subtotal_val">R$ 0,00</span>
+          </div>
+          <div class="flex justify-between text-xs text-rose-400">
+            <span>Desconto:</span>
+            <span id="discount_val">R$ 0,00</span>
+          </div>
+          <div class="flex justify-between text-base font-black text-emerald-400 pt-2 border-t border-slate-800">
+            <span>TOTAL:</span>
+            <span id="total_val">R$ 0,00</span>
+          </div>
+        </div>
+
+        <!-- BOTÃO FINALIZAR VENDA -->
+        <button onclick="finishCheckout()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm rounded-xl shadow-lg transition-transform active:scale-95 cursor-pointer">
+          ⚡ Finalizar Venda
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE SUCESSO / COMPROVANTE WHATSAPP -->
+<div id="success_modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+  <div id="modal_content" class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full space-y-4 text-center">
+    <!-- Conteúdo gerado via JS -->
+  </div>
+</div>
+
+<script>
+let cart = [];
+
+function filterProducts() {
+  const query = document.getElementById('search_input').value.toLowerCase();
+  const cards = document.querySelectorAll('.product-card');
+  cards.forEach(card => {
+    const name = card.getAttribute('data-name');
+    const code = card.getAttribute('data-code');
+    if (name.includes(query) || code.includes(query)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+function updateCustomerPhone() {
+  const select = document.getElementById('customer_select');
+  const selectedOption = select.options[select.selectedIndex];
+  const phone = selectedOption.getAttribute('data-phone') || '';
+  document.getElementById('customer_phone').value = phone;
+}
+
+function addToCart(id, name, sale_price, stock) {
+  const existing = cart.find(item => item.id === id);
+  if (existing) {
+    if (existing.qty + 1 > stock) {
+      alert('Quantidade excede o estoque disponível!');
+      return;
+    }
+    existing.qty += 1;
+  } else {
+    cart.push({ id, name, sale_price, qty: 1, stock });
+  }
+  renderCart();
+}
+
+function removeFromCart(id) {
+  cart = cart.filter(item => item.id !== id);
+  renderCart();
+}
+
+function updateQty(id, newQty) {
+  const item = cart.find(i => i.id === id);
+  if (item) {
+    if (newQty > item.stock) {
+      alert('Estoque insuficiente!');
+      return;
+    }
+    if (newQty <= 0) {
+      removeFromCart(id);
+    } else {
+      item.qty = newQty;
+      renderCart();
+    }
+  }
+}
+
+function clearCart() {
+  cart = [];
+  renderCart();
+}
+
+function renderCart() {
+  const container = document.getElementById('cart_items');
+  if (cart.length === 0) {
+    container.innerHTML = '<div class="text-center py-12 text-slate-500 text-xs">Carrinho vazio. Clique nos produtos ao lado para adicionar.</div>';
+    document.getElementById('subtotal_val').innerText = 'R$ 0,00';
+    document.getElementById('discount_val').innerText = 'R$ 0,00';
+    document.getElementById('total_val').innerText = 'R$ 0,00';
+    return;
+  }
+
+  let subtotal = 0;
+  container.innerHTML = '';
+
+  cart.forEach(item => {
+    const itemTotal = item.sale_price * item.qty;
+    subtotal += itemTotal;
+
+    container.innerHTML += `
+      <div class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+        <div class="flex-1 pr-2">
+          <p class="font-bold text-white truncate">${item.name}</p>
+          <p class="text-[10px] text-slate-400">R$ ${item.sale_price.toFixed(2)} un</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="updateQty(${item.id}, ${item.qty - 1})" class="w-6 h-6 bg-slate-800 text-white rounded font-bold hover:bg-slate-700">-</button>
+          <span class="font-bold text-emerald-400 font-mono">${item.qty}</span>
+          <button onclick="updateQty(${item.id}, ${item.qty + 1})" class="w-6 h-6 bg-slate-800 text-white rounded font-bold hover:bg-slate-700">+</button>
+          <button onclick="removeFromCart(${item.id})" class="text-rose-400 ml-2 hover:text-rose-300">🗑️</button>
+        </div>
+      </div>
+    `;
+  });
+
+  const discount = parseFloat(document.getElementById('discount_input').value) || 0;
+  const total = Math.max(0, subtotal - discount);
+
+  document.getElementById('subtotal_val').innerText = `R$ ${subtotal.toFixed(2)}`;
+  document.getElementById('discount_val').innerText = `R$ ${discount.toFixed(2)}`;
+  document.getElementById('total_val').innerText = `R$ ${total.toFixed(2)}`;
+}
+
+async function finishCheckout() {
+  if (cart.length === 0) {
+    alert('Adicione ao menos um produto no carrinho!');
+    return;
+  }
+
+  const customer_name = document.getElementById('customer_select').value;
+  const payment_method = document.getElementById('payment_method').value;
+  const discount = parseFloat(document.getElementById('discount_input').value) || 0;
+
+  const payload = {
+    items: cart,
+    customer_name: customer_name,
+    payment_method: payment_method,
+    discount: discount,
+    store_id: {{ selected_store_id }}
+  };
+
+  try {
+    const res = await fetch('/pdv/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      const customerPhone = document.getElementById("customer_phone")?.value || "";
+      let cleanPhone = customerPhone.replace(/\D/g, "");
+      if (cleanPhone.length >= 10 && !cleanPhone.startsWith("55")) {
+        cleanPhone = "55" + cleanPhone;
+      }
+
+      const whatsappUrl = cleanPhone 
+        ? `https://wa.me/${cleanPhone}?text=${result.whatsapp_message}`
+        : `https://wa.me/?text=${result.whatsapp_message}`;
+
+      document.getElementById("modal_content").innerHTML = `
+        <div class="text-center space-y-4">
+          <div class="text-4xl">✅</div>
+          <h3 class="text-xl font-bold text-emerald-400">Venda Finalizada com Sucesso!</h3>
+          <p class="text-xs text-slate-400 font-mono">Nº ${result.sale_number}</p>
+          <p class="text-2xl font-black text-white">Total: R$ ${result.total.toFixed(2)}</p>
+          
+          <a href="${whatsappUrl}" target="_blank" class="inline-flex items-center justify-center gap-2 w-full px-6 py-3.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105 text-xs">
+            💬 Enviar Comprovante no WhatsApp
+          </a>
+          
+          <button onclick="window.location.reload()" class="block w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs cursor-pointer">
+            🔄 Iniciar Nova Venda
+          </button>
+        </div>
+      `;
+
+      document.getElementById("success_modal").classList.remove("hidden");
+    } else {
+      alert('Erro ao finalizar venda: ' + result.message);
+    }
+  } catch (err) {
+    alert('Erro de conexão ao processar venda.');
+  }
+}
+</script>
+{% endblock %}

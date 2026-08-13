@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Login ERP Multi-Loja</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-white flex items-center justify-center min-h-screen">
+  <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md space-y-6">
+    <div class="text-center">
+      <h1 class="text-2xl font-black text-emerald-400">🏢 ERP Multi-Loja</h1>
+      <p class="text-xs text-slate-400 mt-1">Acesse sua loja com a senha individual</p>
+    </div>
+
+    {% if error %}
+    <div class="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold rounded-xl text-center">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form action="/login" method="POST" class="space-y-4 text-xs">
+      <div>
+        <label class="block text-slate-400 mb-1 font-bold">Selecione a Loja:</label>
+        <select name="store_id" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-bold text-emerald-400 focus:outline-none">
+          {% for st in stores %}
+          <option value="{{ st.id }}">🏢 {{ st.name }} ({{ st.code }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+        <label class="block text-indigo-300 font-bold mb-1">🔒 Senha da Loja (se exigida):</label>
+        <input type="password" name="store_password" placeholder="Senha da loja selecionada" class="w-full bg-slate-950 border border-indigo-500/30 rounded-xl p-2.5 text-white font-mono">
+      </div>
+
+      <div>
+        <label class="block text-slate-400 mb-1 font-bold">Usuário:</label>
+        <input type="text" name="username" required value="admin" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white">
+      </div>
+
+      <div>
+        <label class="block text-slate-400 mb-1 font-bold">Senha de Acesso:</label>
+        <input type="password" name="password" required value="admin123" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white">
+      </div>
+
+      <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 font-bold text-white rounded-xl shadow cursor-pointer text-sm">
+        🔓 Entrar no Sistema
+      </button>
+    </form>
+  </div>
+</body>
+</html>

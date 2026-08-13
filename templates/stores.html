@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-xl font-bold text-white">🏢 Gestão de Lojas & Filiais</h2>
+    
+    <!-- BOTAO DE UNIFICAR BANCOS DE DADOS (ADMIN) -->
+    <form action="/stores/consolidate" method="POST" onsubmit="return confirm('Deseja unificar os bancos de dados de todas as lojas? Clientes duplicados (por CPF/CNPJ) e produtos em comum serão unificados.');">
+      <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow">
+        ⚡ Unificar Bancos de Dados (Admin)
+      </button>
+    </form>
+  </div>
+
+  <!-- LISTA DE LOJAS CADASTRADAS -->
+  <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-indigo-400">🏢 Selecione uma Loja para Editar ou Excluir</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for st in stores %}
+      <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3 relative {% if st.id == selected_store_id %}border-emerald-500/50 shadow-lg{% endif %}">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-sm text-white">{{ st.name }}</span>
+          <span class="text-[10px] bg-slate-800 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold">{{ st.code or 'LOJA' }}</span>
+        </div>
+        <p class="text-xs text-slate-400">CNPJ: {{ st.document or 'Não informado' }}</p>
+        <p class="text-xs text-slate-400">Status Senha: {% if st.password %}🔒 Senha Ativa{% else %}🔓 Sem Senha{% endif %}</p>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-800/80">
+          <a href="/stores?store_id={{ st.id }}" class="text-xs font-bold text-emerald-400 hover:underline">
+            ✏️ Gerenciar / Alterar Senha
+          </a>
+
+          {% if stores|length > 1 %}
+          <form action="/stores/delete" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir a loja {{ st.name }}?');">
+            <input type="hidden" name="store_id" value="{{ st.id }}">
+            <button type="submit" class="px-2.5 py-1 bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-lg font-bold text-xs transition-colors">
+              🗑️ Excluir
+            </button>
+          </form>
+          {% else %}
+          <span class="text-[10px] text-slate-600 font-bold">Principal</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 1. DEFINIR / EDITAR SENHA DA LOJA SELECIONADA -->
+  <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-emerald-400">🔒 Configurar Senha e Dados da {{ current_store.name }}</h3>
+    <form action="/stores/customize" method="POST" class="space-y-4 text-xs">
+      <input type="hidden" name="store_id" value="{{ current_store.id }}">
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="text-slate-400 block mb-1 font-bold">Nome da Loja:</label>
+          <input type="text" name="name" value="{{ current_store.name }}" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold">
+        </div>
+        
+        <!-- CAMPO ONDE VOCÊ DEFINE A SENHA DA LOJA -->
+        <div>
+          <label class="text-indigo-300 block mb-1 font-bold">🔑 Senha da Loja (Para Login):</label>
+          <input type="password" name="password" value="{{ current_store.password or '' }}" placeholder="Deixe em branco se não quiser senha" class="w-full bg-slate-950 border border-indigo-500/40 rounded-xl p-2.5 text-emerald-400 font-mono font-bold">
+        </div>
+
+        <div>
+          <label class="text-slate-400 block mb-1 font-bold">Texto do Logo no Cabeçalho:</label>
+          <input type="text" name="logo_text" value="{{ current_store.logo_text or current_store.name }}" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-indigo-300 font-mono font-bold">
+        </div>
+      </div>
+
+      <button type="submit" class="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 font-bold text-white rounded-xl shadow cursor-pointer">
+        💾 Salvar Senha e Alterações
+      </button>
+    </form>
+  </div>
+
+  <!-- 2. DEFINIR SENHA AO CADASTRAR NOVA LOJA -->
+  <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-indigo-400">➕ Cadastrar Nova Loja com Senha Própria</h3>
+    <form action="/stores/new" method="POST" class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+      <div>
+        <label class="text-slate-400 block mb-1 font-bold">Nome da Filial:</label>
+        <input type="text" name="name" required placeholder="Ex: Filial Zona Sul" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1 font-bold">Código Identificador:</label>
+        <input type="text" name="code" placeholder="Ex: LOJA-02" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1 font-bold">CNPJ:</label>
+        <input type="text" name="document" placeholder="00.000.000/0001-00" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+      </div>
+      <div>
+        <label class="text-indigo-300 block mb-1 font-bold">🔑 Senha da Loja:</label>
+        <input type="password" name="password" placeholder="Senha de entrada" class="w-full bg-slate-950 border border-indigo-500/40 rounded-xl p-2.5 text-emerald-400 font-mono">
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs cursor-pointer">➕ Cadastrar Loja</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

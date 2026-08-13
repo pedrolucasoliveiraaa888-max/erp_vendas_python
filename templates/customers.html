@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-xl font-bold text-white">👥 Cadastro de Clientes & WhatsApp</h2>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+    <h3 class="text-sm font-bold text-emerald-400">➕ Cadastrar Novo Cliente</h3>
+    <form action="/customers/new" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+      <input type="hidden" name="store_id" value="{{ selected_store_id }}">
+      
+      <div>
+        <label class="block text-slate-400 font-bold mb-1">Nome do Cliente:</label>
+        <input type="text" name="name" required placeholder="Ex: João da Silva" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+      </div>
+
+      <div>
+        <label class="block text-slate-400 font-bold mb-1">CPF ou CNPJ:</label>
+        <input type="text" name="document" placeholder="000.000.000-00" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+      </div>
+
+      <div>
+        <label class="block text-slate-400 font-bold mb-1">Telefone / WhatsApp:</label>
+        <input type="text" name="phone" placeholder="(11) 99999-9999" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+      </div>
+
+      <div class="flex items-end">
+        <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold text-white rounded-xl shadow cursor-pointer text-xs">
+          💾 Salvar Cliente
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-indigo-400">📋 Clientes Registrados</h3>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for c in customers %}
+      <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-white text-sm">{{ c.name }}</span>
+          <span class="text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded">ID #{{ c.id }}</span>
+        </div>
+
+        <p class="text-xs text-slate-400">CPF/CNPJ: <span class="text-slate-200 font-mono">{{ c.document or 'Não informado' }}</span></p>
+        <p class="text-xs text-slate-400">Telefone: <span class="text-slate-200 font-mono">{{ c.phone or 'Não informado' }}</span></p>
+
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
+          {% if c.clean_phone %}
+          <a href="https://wa.me/{{ c.clean_phone }}?text=Olá%20{{ c.name }},%20tudo%20bem?" target="_blank" class="px-3 py-1.5 bg-green-600/20 text-green-400 border border-green-500/30 hover:bg-green-600 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-colors">
+            💬 Conversar no WhatsApp
+          </a>
+          {% else %}
+          <span class="text-[11px] text-slate-600 font-bold">Sem WhatsApp</span>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="col-span-full text-center py-8 text-slate-500 text-xs">
+        Nenhum cliente cadastrado ainda. Use o formulário acima para adicionar!
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

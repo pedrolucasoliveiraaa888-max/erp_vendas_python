@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-xl font-bold text-white">📥 Importação de Informações (PDF / XML / Texto)</h2>
+      <p class="text-xs text-slate-400 mt-1">Cadastre produtos e relatórios em lote colando os dados ou importando listas.</p>
+    </div>
+  </div>
+
+  <!-- CAIXA DE IMPORTAÇÃO RÁPIDA DE PRODUTOS -->
+  <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-indigo-400 flex items-center gap-2">
+      <span>📄 Importar Lista de Produtos em Lote</span>
+    </h3>
+
+    <form action="/import-pdf/process" method="POST" class="space-y-4 text-xs">
+      <input type="hidden" name="store_id" value="{{ selected_store_id }}">
+
+      <div>
+        <label class="block text-slate-300 font-bold mb-1">Cole aqui o texto do PDF, Nota Fiscal ou Tabela de Produtos:</label>
+        <textarea name="import_data" rows="8" placeholder="Exemplo de formato (Código, Nome, Preço Venda, Quantidade):
+7891001, Camiseta Preta M, 49.90, 20
+7891002, Calça Jeans Azul 42, 119.00, 15
+7891003, Tênis Esportivo, 199.90, 10" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-emerald-400 font-mono focus:outline-none focus:border-indigo-500"></textarea>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <span class="text-[11px] text-slate-500">Separado por vírgula ou uma linha por produto.</span>
+        <button type="submit" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95 cursor-pointer">
+          ⚡ Processar e Importar para o Estoque
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% if success_msg %}
+  <div class="p-4 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold">
+    {{ success_msg }}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

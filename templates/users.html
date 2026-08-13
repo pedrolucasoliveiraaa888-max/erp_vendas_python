@@ -1,0 +1,65 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-xl font-bold text-white">👤 Gestão de Usuários & Permissões (Admin Exclusivo)</h2>
+  </div>
+
+  <!-- PAINEL DE PERMISSÕES DOS USUÁRIOS EXISTENTES -->
+  <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-emerald-400">🔑 Usuários Cadastrados & Concessão de Permissões</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for u in users %}
+      <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-white text-sm">{{ u.name }} (@{{ u.username }})</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded font-mono {% if u.role == 'ADMIN' %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% else %}bg-indigo-500/20 text-indigo-300 border border-indigo-500/30{% endif %}">
+            {{ u.role }}
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">Loja Vinculada: <strong class="text-white">{{ u.store_name or 'Todas' }}</strong></p>
+
+        {% if u.role != 'ADMIN' %}
+        <form action="/users/permissions/update" method="POST" class="space-y-2 pt-2 border-t border-slate-800 text-xs">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          
+          <div>
+            <label class="block text-slate-400 text-[11px] mb-1">Nova Senha do Usuário (Opcional):</label>
+            <input type="password" name="password" placeholder="Digite para alterar a senha" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-emerald-400 font-mono">
+          </div>
+
+          <div class="space-y-1.5 pt-2">
+            <span class="block text-[11px] font-bold text-indigo-300">Conceder Permissões Especiais:</span>
+            
+            <label class="flex items-center gap-2 text-slate-300">
+              <input type="checkbox" name="can_give_discount" value="1" {% if u.can_give_discount %}checked{% endif %} class="accent-emerald-500">
+              <span>Dar Descontos no PDV</span>
+            </label>
+
+            <label class="flex items-center gap-2 text-slate-300">
+              <input type="checkbox" name="can_cancel_sales" value="1" {% if u.can_cancel_sales %}checked{% endif %} class="accent-emerald-500">
+              <span>Cancelar Vendas Fechadas</span>
+            </label>
+
+            <label class="flex items-center gap-2 text-slate-300">
+              <input type="checkbox" name="can_manage_products" value="1" {% if u.can_manage_products %}checked{% endif %} class="accent-emerald-500">
+              <span>Cadastrar/Editar Produtos & Estoque</span>
+            </label>
+
+            <label class="flex items-center gap-2 text-slate-300">
+              <input type="checkbox" name="can_view_reports" value="1" {% if u.can_view_reports %}checked{% endif %} class="accent-emerald-500">
+              <span>Visualizar Relatórios Financeiros</span>
+            </label>
+          </div>
+
+          <button type="submit" class="w-full mt-2 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs cursor-pointer">
+            💾 Atualizar Permissões & Senha
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

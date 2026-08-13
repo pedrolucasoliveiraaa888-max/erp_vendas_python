@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-xl font-bold text-white">Despesas Operacionais</h2>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+    <h3 class="text-sm font-bold text-emerald-400">Lançar Nova Despesa</h3>
+    <form action="/expenses/new" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+      <input type="hidden" name="store_id" value="{{ selected_store_id }}">
+      <div>
+        <label class="text-slate-400 block mb-1">Descrição / Motivo:</label>
+        <input type="text" name="description" required placeholder="Ex: Conta de Luz / Aluguel" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1">Categoria:</label>
+        <select name="category" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
+          <option value="Geral">Geral</option>
+          <option value="Aluguel">Aluguel / Imóvel</option>
+          <option value="Energia/Água">Energia / Água</option>
+          <option value="Manutenção">Manutenção / Equipamentos</option>
+          <option value="Salários">Salários / Pessoal</option>
+          <option value="Impostos">Impostos / Taxas</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1">Valor (R$):</label>
+        <input type="number" step="0.01" name="amount" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs">Lançar Despesa</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+    <table class="w-full text-left text-xs">
+      <thead class="bg-slate-950 text-slate-400 border-b border-slate-800">
+        <tr>
+          <th class="p-3">Data</th>
+          <th class="p-3">Descrição</th>
+          <th class="p-3">Categoria</th>
+          <th class="p-3">Valor</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for e in expenses %}
+        <tr class="hover:bg-slate-800/50">
+          <td class="p-3 text-slate-400">{{ e.date }}</td>
+          <td class="p-3 font-bold text-white">{{ e.description }}</td>
+          <td class="p-3 text-slate-300">{{ e.category or 'Geral' }}</td>
+          <td class="p-3 font-bold text-rose-400">R$ {{ "%.2f"|format(e.amount) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="p-6 text-center text-slate-500">Nenhuma despesa registrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

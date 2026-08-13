@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6 print:p-0">
+  <div class="flex items-center justify-between print:hidden">
+    <h2 class="text-xl font-bold text-white">📈 Relatórios & Desempenho</h2>
+    <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow">
+      🖨️ Imprimir / Salvar PDF
+    </button>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-2">
+    <h3 class="text-sm font-bold text-slate-400">Total Faturado em Vendas</h3>
+    <p class="text-3xl font-black text-emerald-400">R$ {{ "%.2f"|format(total_sales_val) }}</p>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden">
+    <h3 class="text-sm font-bold text-white mb-3">Histórico de Vendas</h3>
+    <table class="w-full text-left text-xs">
+      <thead class="bg-slate-950 text-slate-400">
+        <tr>
+          <th class="p-3">Nº Venda</th>
+          <th class="p-3">Data</th>
+          <th class="p-3">Cliente</th>
+          <th class="p-3">Pagamento</th>
+          <th class="p-3 text-right">Total (R$)</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for s in sales %}
+        <tr>
+          <td class="p-3 font-mono font-bold text-indigo-400">{{ s.sale_number }}</td>
+          <td class="p-3 text-slate-400">{{ s.created_at }}</td>
+          <td class="p-3 font-bold text-white">{{ s.customer_name }}</td>
+          <td class="p-3 text-slate-300">{{ s.payment_method }}</td>
+          <td class="p-3 text-right font-black text-emerald-400">R$ {{ "%.2f"|format(s.total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

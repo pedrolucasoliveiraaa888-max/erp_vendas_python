@@ -1,0 +1,89 @@
+import sqlite3
+
+DB_NAME = "erp.db"
+
+def get_db():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            barcode TEXT,
+            name TEXT NOT NULL,
+            category TEXT,
+            cost_price REAL DEFAULT 0,
+            sale_price REAL NOT NULL,
+            stock_quantity REAL DEFAULT 0,
+            min_stock REAL DEFAULT 5,
+            unit TEXT DEFAULT 'UN'
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            document TEXT,
+            phone TEXT,
+            credit_limit REAL DEFAULT 1000,
+            blocked INTEGER DEFAULT 0,
+            block_reason TEXT
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cash_registers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            opened_at TEXT NOT NULL,
+            closed_at TEXT,
+            user_name TEXT NOT NULL,
+            initial_balance REAL NOT NULL,
+            status TEXT DEFAULT 'ABERTO'
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_number TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL,
+            seller_name TEXT NOT NULL,
+            customer_name TEXT,
+            subtotal REAL NOT NULL,
+            discount REAL DEFAULT 0,
+            total REAL NOT NULL,
+            payment_method TEXT NOT NULL,
+            cash_register_id INTEGER
+        )
+    ''')
+
+    cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+    if not cursor.fetchone():
+        cursor.execute(
+            "INSERT INTO users (username, name, password_hash, role) VALUES (?, ?, ?, ?)",
+            ('admin', 'Administrador do Sistema', 'admin123', 'ADMIN')
+        )
+
+    conn.commit()
+    conn.close()
+
+if __name__ == "__main__":
+    init_db()
+    print("✅ Banco de dados SQLite criado com sucesso em erp.db!")

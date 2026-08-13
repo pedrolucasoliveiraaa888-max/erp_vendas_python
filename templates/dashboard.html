@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="space-y-6">
+  <h2 class="text-xl font-bold text-white">Visao Geral do Negocio</h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+      <span class="text-xs text-slate-400 uppercase font-semibold">Total de Produtos</span>
+      <p class="text-3xl font-black text-white mt-1">{{ total_products }}</p>
+    </div>
+    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+      <span class="text-xs text-slate-400 uppercase font-semibold">Faturamento Vendas</span>
+      <p class="text-3xl font-black text-emerald-400 mt-1">R$ {{ "%.2f"|format(total_sales) }}</p>
+    </div>
+    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+      <span class="text-xs text-slate-400 uppercase font-semibold">Clientes Cadastrados</span>
+      <p class="text-3xl font-black text-white mt-1">{{ total_customers }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
