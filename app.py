@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 import uvicorn
 import sqlite3
@@ -121,7 +121,7 @@ def get_user(request: Request):
     return request.session.get("user")
 
 # ==========================================
-# 2. LAYOUT BASE
+# 2. LAYOUT BASE COM SUPORTE PWA/OFFLINE
 # ==========================================
 def render_layout(request: Request, content: str, title: str = "ERP Vendas", active_tab: str = "dashboard", msg: str = ""):
     user = get_user(request)
@@ -148,8 +148,17 @@ def render_layout(request: Request, content: str, title: str = "ERP Vendas", act
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="theme-color" content="#0f172a">
+        <link rel="manifest" href="/manifest.json">
         <title>{title}</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+          if ('serviceWorker' in navigator) {{
+            window.addEventListener('load', () => {{
+              navigator.serviceWorker.register('/sw.js');
+            }});
+          }}
+        </script>
     </head>
     <body class="bg-slate-950 text-slate-100 min-h-screen">
         <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
@@ -202,7 +211,18 @@ def render_layout(request: Request, content: str, title: str = "ERP Vendas", act
     return HTMLResponse(content=html)
 
 # ==========================================
-# 3. AUTENTICAÇÃO
+# 3. ROTAS PWA / OFFLINE (MANIFEST & SERVICE WORKER)
+# ==========================================
+@app.get("/manifest.json")
+def manifest():
+    return FileResponse("manifest.json", media_type="application/json")
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse("sw.js", media_type="application/javascript")
+
+# ==========================================
+# 4. AUTENTICAÇÃO
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
 @app.get("/login", response_class=HTMLResponse)
@@ -222,8 +242,18 @@ def login_page(request: Request, error: str = ""):
     <html lang="pt-br">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="theme-color" content="#0f172a">
+        <link rel="manifest" href="/manifest.json">
         <title>Login - ERP Vendas</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+          if ('serviceWorker' in navigator) {{
+            window.addEventListener('load', () => {{
+              navigator.serviceWorker.register('/sw.js');
+            }});
+          }}
+        </script>
     </head>
     <body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-4">
         <div class="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl space-y-6">
@@ -301,7 +331,7 @@ def logout(request: Request):
     return RedirectResponse(url="/login", status_code=303)
 
 # ==========================================
-# 4. DASHBOARD E EXCLUSÃO DE VENDAS
+# 5. DASHBOARD E EXCLUSÃO DE VENDAS
 # ==========================================
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, msg: str = ""):
@@ -375,7 +405,7 @@ def dashboard(request: Request, msg: str = ""):
     return render_layout(request, content, "Dashboard", "dashboard", msg)
 
 # ==========================================
-# 5. PDV / CAIXA COM LUPAS DE PESQUISA
+# 6. PDV / CAIXA COM LUPAS DE PESQUISA
 # ==========================================
 @app.get("/pdv", response_class=HTMLResponse)
 def pdv(request: Request, msg: str = ""):
@@ -402,7 +432,6 @@ def pdv(request: Request, msg: str = ""):
             </div>
             
             <div class="space-y-3 font-bold text-xs">
-                <!-- Filtro de Lupa Rápido do Produto -->
                 <div class="relative">
                     <label class="block text-slate-300 mb-1">🔍 Digite o código ou nome do produto:</label>
                     <input type="text" id="pdv_search_input" oninput="filterProducts()" placeholder="🔍 Pesquisar produto..." class="w-full bg-slate-950 border border-emerald-500/40 rounded-xl p-3 text-emerald-400 font-mono text-sm focus:outline-none mb-2">
@@ -493,7 +522,6 @@ def pdv(request: Request, msg: str = ""):
             </div>
             <input type="text" id="cust_search_input" oninput="filterCustomerList()" placeholder="Digite nome, CPF ou telefone..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none">
             <div id="cust_search_results" class="max-h-60 overflow-y-auto space-y-1 divide-y divide-slate-800">
-                <!-- Preenchido via JS -->
             </div>
         </div>
     </div>
@@ -507,7 +535,6 @@ def pdv(request: Request, msg: str = ""):
             </div>
             <input type="text" id="prod_modal_search" oninput="filterProductCatalog()" placeholder="Digite código ou nome do produto..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-emerald-400 font-bold focus:outline-none">
             <div id="prod_search_results" class="max-h-72 overflow-y-auto space-y-1.5">
-                <!-- Preenchido via JS -->
             </div>
         </div>
     </div>
@@ -524,7 +551,7 @@ def pdv(request: Request, msg: str = ""):
     const allCustomers = Array.from(document.querySelectorAll('#pdv_customer option')).map(opt => opt.value);
 
     function filterProducts() {{
-        const query = document.getElementById('pdv_search_input').value.toLowerCase().strip();
+        const query = document.getElementById('pdv_search_input').value.toLowerCase().trim();
         const select = document.getElementById('pdv_product');
         Array.from(select.options).forEach(opt => {{
             if (!opt.value) return;
@@ -748,7 +775,7 @@ async def pdv_checkout(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 # ==========================================
-# 6. EXCLUSÃO GERAL (INCLUINDO VENDAS COM ESTORNO)
+# 7. EXCLUSÃO GERAL
 # ==========================================
 @app.post("/delete-item")
 def delete_item(request: Request, item_type: str = Form(...), item_id: int = Form(...)):
@@ -757,7 +784,6 @@ def delete_item(request: Request, item_type: str = Form(...), item_id: int = For
     msg = "Item removido com sucesso!"
 
     if item_type == "sale":
-        # 1. Devolve os produtos ao estoque
         sale_items = conn.execute("SELECT product_id, quantity FROM sale_items WHERE sale_id = ?", (item_id,)).fetchall()
         for item in sale_items:
             p_id = item["product_id"]
@@ -765,7 +791,6 @@ def delete_item(request: Request, item_type: str = Form(...), item_id: int = For
             if p_id and p_id > 0 and qty > 0:
                 conn.execute("UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?", (qty, p_id))
 
-        # 2. Deleta itens da venda, dívidas vinculadas e a própria venda
         conn.execute("DELETE FROM sale_items WHERE sale_id = ?", (item_id,))
         conn.execute("DELETE FROM receivables WHERE sale_id = ?", (item_id,))
         conn.execute("DELETE FROM sales WHERE id = ?", (item_id,))
@@ -793,7 +818,7 @@ def delete_item(request: Request, item_type: str = Form(...), item_id: int = For
     return RedirectResponse(url=f"{redirect_url}?msg={urllib.parse.quote(msg)}", status_code=303)
 
 # ==========================================
-# 7. OUTROS MÓDULOS (FIADO, CLIENTES, LOJAS, RELATÓRIOS)
+# 8. OUTROS MÓDULOS
 # ==========================================
 @app.get("/receivables", response_class=HTMLResponse)
 def receivables_list(request: Request, msg: str = ""):
