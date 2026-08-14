@@ -24,7 +24,7 @@ def init_db():
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS stores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT, password TEXT DEFAULT '1234', logo_text TEXT DEFAULT 'CERBERUS-SISTEM'
+        name TEXT, city TEXT DEFAULT 'Matriz', password TEXT DEFAULT '1234', logo_text TEXT DEFAULT 'CERBERUS-SISTEM'
     )""")
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,14 +66,17 @@ def init_db():
         description TEXT, amount REAL DEFAULT 0, category TEXT DEFAULT 'Geral', date TEXT, store_id INTEGER DEFAULT 1
     )""")
 
+    # Inicialização das Lojas padrão
     if not c.execute("SELECT * FROM stores WHERE id = 1").fetchone():
-        c.execute("INSERT INTO stores (id, name, password, logo_text) VALUES (1, 'Matriz Principal', '1234', 'CERBERUS MATRIZ')")
-        c.execute("INSERT INTO stores (id, name, password, logo_text) VALUES (2, 'Filial 01', '1234', 'CERBERUS FILIAL 1')")
+        c.execute("INSERT INTO stores (id, name, city, password, logo_text) VALUES (1, 'Matriz Principal', 'Centro', '1234', 'CERBERUS MATRIZ')")
+        c.execute("INSERT INTO stores (id, name, city, password, logo_text) VALUES (2, 'Filial 01', 'Zona Sul', '1234', 'CERBERUS FILIAL 1')")
 
+    # Usuários Padrão
     if not c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone():
         c.execute("INSERT INTO users (username, password_hash, name, role, store_id) VALUES ('admin', 'admin123', 'Administrador', 'ADMIN', 1)")
         c.execute("INSERT INTO users (username, password_hash, name, role, store_id) VALUES ('vendedor', '123456', 'Vendedor Teste', 'VENDEDOR', 1)")
 
+    # Produtos de Exemplo
     if not c.execute("SELECT * FROM products").fetchone():
         c.execute("INSERT INTO products (code, barcode, name, category, sale_price, cost_price, stock_quantity, min_stock, store_id) VALUES ('101', '78910001', 'Camiseta Básica Preta', 'Vestuário', 49.90, 22.00, 25, 5, 1)")
         c.execute("INSERT INTO products (code, barcode, name, category, sale_price, cost_price, stock_quantity, min_stock, store_id) VALUES ('102', '78910002', 'Tênis Esportivo Pro', 'Calçados', 189.00, 95.00, 8, 3, 1)")
@@ -86,10 +89,20 @@ init_db()
 app = FastAPI(title="CERBERUS-SISTEM")
 app.add_middleware(SessionMiddleware, secret_key="cerberus_secret_pro_key_2026")
 
-# Elimina erros 404 de Service Worker e Favicon
+@app.get("/manifest.json")
+async def manifest():
+    return JSONResponse({
+        "name": "CERBERUS-SISTEM ERP",
+        "short_name": "CERBERUS",
+        "start_url": "/dashboard",
+        "display": "standalone",
+        "background_color": "#040814",
+        "theme_color": "#0284c7"
+    })
+
 @app.get("/sw.js")
 async def service_worker():
-    return Response(content="// sw.js placeholder", media_type="application/javascript")
+    return Response(content="// sw.js offline placeholder", media_type="application/javascript")
 
 @app.get("/favicon.ico")
 async def favicon():
@@ -99,7 +112,7 @@ def get_user(request: Request):
     return request.session.get("user")
 
 # ==========================================
-# 2. LOGO E LAYOUT
+# 2. LOGO E LAYOUT COM SEGURANÇA POR PERFIL
 # ==========================================
 def get_logo_svg(size=36):
     return f'''<svg viewBox="0 0 200 200" width="{size}" height="{size}" class="shrink-0 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]" fill="none">
@@ -116,6 +129,7 @@ def render_layout(request: Request, content: str, title: str = "CERBERUS-SISTEM"
     if not user:
         return RedirectResponse(url="/login?msg=Por+favor,+faca+login+para+acessar", status_code=303)
 
+    is_admin = (user.get("role") == "ADMIN")
     conn = get_db()
     stores = conn.execute("SELECT * FROM stores").fetchall()
     current_store = conn.execute("SELECT * FROM stores WHERE id = ?", (user.get("store_id", 1),)).fetchone()
@@ -127,12 +141,32 @@ def render_layout(request: Request, content: str, title: str = "CERBERUS-SISTEM"
 
     def tc(t): return "bg-blue-600 text-white font-bold shadow-lg shadow-blue-900/40" if active_tab == t else "text-slate-400 hover:text-white hover:bg-slate-800/60"
 
+    # Se for ADMIN: botão para trocar de loja com senha
+    # Se for VENDEDOR: fixo na loja designada
+    if is_admin:
+        store_selector_html = f'''
+        <button type="button" onclick="document.getElementById('switch_store_modal').classList.remove('hidden')" class="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 font-bold px-3 py-1.5 rounded-xl text-xs cursor-pointer transition-all">
+            <span>🏢 {store_name}</span>
+            <span class="text-[10px] text-slate-400">🔄 Trocar</span>
+        </button>
+        '''
+    else:
+        store_selector_html = f'''
+        <div class="flex items-center gap-2 bg-slate-900/80 border border-slate-800 text-sky-300 font-bold px-3 py-1.5 rounded-xl text-xs">
+            <span>🏢 {store_name}</span>
+            <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Fixo</span>
+        </div>
+        '''
+
+    menu_stores_users = f'<a href="/stores-users" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold {tc("stores_users")}">⚙️ <span>Lojas & Funcionários</span></a>' if is_admin else ''
+
     html = f"""<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - CERBERUS-SISTEM</title>
+    <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
@@ -155,7 +189,7 @@ def render_layout(request: Request, content: str, title: str = "CERBERUS-SISTEM"
             <a href="/suppliers" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold {tc('suppliers')}">🏬 <span>Fornecedores</span></a>
             <a href="/import-pdf" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold {tc('import_pdf')}">📄 <span>Importar PDF / OCR</span></a>
             <a href="/reports" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold {tc('reports')}">📈 <span>Relatórios & DRE</span></a>
-            <a href="/stores-users" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold {tc('stores_users')}">⚙️ <span>Lojas & Funcionários</span></a>
+            {menu_stores_users}
         </nav>
         <div class="p-3 border-t border-[#0e1a33] text-center">
             <p class="text-[10px] text-slate-500 font-bold">CERBERUS-SISTEM v2.0</p>
@@ -166,11 +200,10 @@ def render_layout(request: Request, content: str, title: str = "CERBERUS-SISTEM"
         <header class="h-14 bg-[#070d1e] border-b border-[#0e1a33] px-6 flex items-center justify-between sticky top-0 z-40">
             <div class="flex items-center gap-3">
                 <span class="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-3 py-1 rounded-xl">🏢 {store_name}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded {'bg-blue-500/20 text-blue-300 border border-blue-500/30' if is_admin else 'bg-slate-800 text-slate-400'}">{user.get('role', 'OPERADOR')}</span>
             </div>
             <div class="flex items-center gap-4">
-                <form action="/change-store-direct" method="POST" class="flex items-center gap-2">
-                    <select name="store_id" onchange="this.form.submit()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1 text-xs text-sky-300 font-bold cursor-pointer">{store_options}</select>
-                </form>
+                {store_selector_html}
                 <div class="flex items-center gap-3 pl-3 border-l border-slate-800">
                     <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xs">{user['name'][0].upper()}</div>
                     <span class="text-xs font-bold text-white">{user['name']}</span>
@@ -185,12 +218,39 @@ def render_layout(request: Request, content: str, title: str = "CERBERUS-SISTEM"
             {content}
         </main>
     </div>
+
+    <!-- MODAL DE TROCA DE LOJA (EXIGE SENHA DA LOJA PARA O ADMIN) -->
+    <div id="switch_store_modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+        <div class="bg-[#0b1329] border border-slate-700 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-white">🔄 Alternar Loja / Filial</h3>
+                <button type="button" onclick="document.getElementById('switch_store_modal').classList.add('hidden')" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <p class="text-xs text-slate-400">Selecione a loja e informe a <b>senha de acesso da loja</b>:</p>
+            <form action="/change-store-direct" method="POST" class="space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block text-slate-300 mb-1">Loja de Destino:</label>
+                    <select name="store_id" class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-sky-300 font-bold">
+                        {store_options}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">🔒 Senha da Loja:</label>
+                    <input type="password" name="store_password" required placeholder="Digite a senha da loja" class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-mono">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="document.getElementById('switch_store_modal').classList.add('hidden')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl cursor-pointer">Confirmar Acesso</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 </html>"""
     return HTMLResponse(content=html)
 
 # ==========================================
-# 3. AUTENTICAÇÃO, LOGIN & LOGOUT
+# 3. AUTENTICAÇÃO COM DUPLA VALIDAÇÃO
 # ==========================================
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, msg: str = ""):
@@ -227,7 +287,7 @@ def login_page(request: Request, msg: str = ""):
 
         <form action="/login" method="POST" class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">🏢 Loja / Filial</label>
+                <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">🏢 Loja / Filial Selecionada</label>
                 <select name="store_id" class="w-full bg-[#060b17] border border-slate-700 text-sky-300 font-bold rounded-xl px-3.5 py-3 text-xs focus:outline-none focus:border-sky-500 cursor-pointer">
                     {store_options}
                 </select>
@@ -239,8 +299,13 @@ def login_page(request: Request, msg: str = ""):
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">🔒 Senha</label>
+                <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">🔒 Senha do Usuário</label>
                 <input type="password" id="login_password" name="password" required placeholder="Digite sua senha" class="w-full bg-[#060b17] border border-slate-700 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">🔑 Senha da Loja (Segurança)</label>
+                <input type="password" name="store_password" required placeholder="Senha de acesso da loja" class="w-full bg-[#060b17] border border-slate-700 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
             </div>
 
             <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-blue-900/40 transition-all cursor-pointer flex items-center justify-center gap-2">
@@ -253,24 +318,42 @@ def login_page(request: Request, msg: str = ""):
     return HTMLResponse(content=html)
 
 @app.post("/login")
-def login_submit(request: Request, username: str = Form(...), password: str = Form(...), store_id: int = Form(1)):
+def login_submit(request: Request, username: str = Form(...), password: str = Form(...), store_id: int = Form(1), store_password: str = Form("")):
     clean_user = username.strip()
     clean_pass = password.strip()
+    clean_store_pass = store_password.strip()
+
     conn = get_db()
     u = conn.execute("SELECT * FROM users WHERE username = ? AND password_hash = ?", (clean_user, clean_pass)).fetchone()
+    store = conn.execute("SELECT * FROM stores WHERE id = ?", (store_id,)).fetchone()
     conn.close()
 
-    if u:
-        request.session["user"] = {
-            "id": u["id"],
-            "username": u["username"],
-            "name": u["name"],
-            "role": u["role"],
-            "store_id": int(store_id or u["store_id"] or 1)
-        }
-        return RedirectResponse(url=f"/dashboard?msg=Bem-vindo,+{urllib.parse.quote(u['name'])}!", status_code=303)
-    else:
+    if not u:
         return RedirectResponse(url="/login?msg=Usuario+ou+senha+incorretos!+Tente+novamente.", status_code=303)
+
+    if not store:
+        return RedirectResponse(url="/login?msg=Loja+selecionada+invalida.", status_code=303)
+
+    # 1. Validação da Senha da Loja
+    expected_store_pass = store["password"] or "1234"
+    if clean_store_pass != expected_store_pass:
+        return RedirectResponse(url="/login?msg=Senha+da+loja+incorreta!+Acesso+negado.", status_code=303)
+
+    # 2. Se for FUNCIONÁRIO (VENDEDOR), NÃO pode acessar loja diferente da designada
+    user_role = u["role"]
+    user_assigned_store = int(u["store_id"] or 1)
+    
+    if user_role != "ADMIN" and int(store_id) != user_assigned_store:
+        return RedirectResponse(url="/login?msg=Acesso+negado!+Seu+usuario+so+tem+permissao+para+acessar+a+sua+loja+designada.", status_code=303)
+
+    request.session["user"] = {
+        "id": u["id"],
+        "username": u["username"],
+        "name": u["name"],
+        "role": u["role"],
+        "store_id": int(store_id) if user_role == "ADMIN" else user_assigned_store
+    }
+    return RedirectResponse(url=f"/dashboard?msg=Bem-vindo,+{urllib.parse.quote(u['name'])}!", status_code=303)
 
 @app.get("/logout")
 def logout(request: Request):
@@ -285,13 +368,29 @@ def index_redirect(request: Request):
     return RedirectResponse(url="/login", status_code=303)
 
 @app.post("/change-store-direct")
-def change_store_direct(request: Request, store_id: int = Form(...)):
+def change_store_direct(request: Request, store_id: int = Form(...), store_password: str = Form(...)):
     user = get_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
-    user["store_id"] = store_id
+
+    # Apenas ADMIN pode alternar entre lojas
+    if user.get("role") != "ADMIN":
+        return RedirectResponse(url="/dashboard?msg=Acesso+negado!+Apenas+administradores+podem+alternar+entre+lojas.", status_code=303)
+
+    conn = get_db()
+    target_store = conn.execute("SELECT * FROM stores WHERE id = ?", (store_id,)).fetchone()
+    conn.close()
+
+    if not target_store:
+        return RedirectResponse(url="/dashboard?msg=Loja+inexistente.", status_code=303)
+
+    expected_pass = target_store["password"] or "1234"
+    if store_password.strip() != expected_pass:
+        return RedirectResponse(url="/dashboard?msg=Senha+da+loja+incorreta!+Nao+foi+possivel+alternar.", status_code=303)
+
+    user["store_id"] = int(store_id)
     request.session["user"] = user
-    return RedirectResponse(url="/dashboard?msg=Loja+alterada+com+sucesso!", status_code=303)
+    return RedirectResponse(url=f"/dashboard?msg=Loja+alterada+para+{urllib.parse.quote(target_store['name'])}+com+sucesso!", status_code=303)
 
 # ==========================================
 # 4. DASHBOARD / PAINEL GERAL
@@ -800,285 +899,7 @@ def customer_delete(id: int = Form(...)):
     return RedirectResponse(url="/customers?msg=Cliente+excluido+com+sucesso!", status_code=303)
 
 # ==========================================
-# 7. GESTÃO DE LOJAS E FUNCIONÁRIOS
-# ==========================================
-@app.get("/stores-users", response_class=HTMLResponse)
-def stores_users_page(request: Request, msg: str = ""):
-    user = get_user(request)
-    if not user:
-        return RedirectResponse(url="/login?msg=Por+favor,+faca+login+para+acessar", status_code=303)
-
-    conn = get_db()
-    stores = conn.execute("SELECT * FROM stores ORDER BY id ASC").fetchall()
-    users = conn.execute("SELECT u.*, s.name as store_name FROM users u LEFT JOIN stores s ON u.store_id = s.id ORDER BY u.id ASC").fetchall()
-    conn.close()
-
-    is_admin = user.get("role") == "ADMIN"
-    
-    s_rows = []
-    for s in stores:
-        s_json = json.dumps({"id": s["id"], "name": s["name"], "password": s["password"] or "1234"})
-        del_btn = f"""<form action="/store-delete" method="POST" class="inline" onsubmit="return confirm('Excluir esta loja?')">
-            <input type="hidden" name="id" value="{s['id']}">
-            <button type="submit" class="bg-rose-950/60 hover:bg-rose-600 text-rose-300 px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer">🗑️</button>
-        </form>""" if s["id"] != 1 else '<span class="text-[10px] text-slate-500 font-bold">Matriz</span>'
-        
-        pwd_display = f'<span class="pwd-val hidden font-mono font-bold text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40">{s["password"] or "1234"}</span><span class="pwd-dots text-slate-500 font-mono tracking-widest text-xs">••••</span>' if is_admin else '<span class="text-slate-500 font-mono tracking-widest text-xs">••••</span>'
-
-        s_rows.append(f"""<tr class="border-b border-slate-800 text-xs">
-            <td class="p-3 font-mono text-sky-400 font-bold">#{s['id']}</td>
-            <td class="p-3 font-bold text-white">{s['name']}</td>
-            <td class="p-3">{pwd_display}</td>
-            <td class="p-3 text-center flex items-center justify-center gap-1.5">
-                <button type="button" onclick='openEditStoreModal({s_json})' class="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer">✏️ Editar</button>
-                {del_btn}
-            </td>
-        </tr>""")
-
-    u_rows = []
-    for u in users:
-        u_json = json.dumps({
-            "id": u["id"], "name": u["name"], "username": u["username"], 
-            "password": u["password_hash"] or "", "role": u["role"], "store_id": u["store_id"]
-        })
-        del_u_btn = f"""<form action="/user-delete" method="POST" class="inline" onsubmit="return confirm('Excluir este funcionário?')">
-            <input type="hidden" name="id" value="{u['id']}">
-            <button type="submit" class="bg-rose-950/60 hover:bg-rose-600 text-rose-300 px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer">🗑️</button>
-        </form>""" if u["username"] != "admin" else '<span class="text-[10px] text-slate-500 font-bold">Principal</span>'
-
-        u_pwd_display = f'<span class="pwd-val hidden font-mono font-bold text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40">{u["password_hash"] or "••••"}</span><span class="pwd-dots text-slate-500 font-mono tracking-widest text-xs">••••••••</span>' if is_admin else '<span class="text-slate-500 font-mono tracking-widest text-xs">••••••••</span>'
-
-        u_rows.append(f"""<tr class="border-b border-slate-800 text-xs">
-            <td class="p-3 font-bold text-white">{u['name']}</td>
-            <td class="p-3 font-mono text-sky-400">{u['username']}</td>
-            <td class="p-3">{u_pwd_display}</td>
-            <td class="p-3 font-bold text-slate-300">{u['role']}</td>
-            <td class="p-3 text-slate-400">{u['store_name'] or 'Matriz'}</td>
-            <td class="p-3 text-center flex items-center justify-center gap-1.5">
-                <button type="button" onclick='openEditUserModal({u_json})' class="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer">✏️ Editar</button>
-                {del_u_btn}
-            </td>
-        </tr>""")
-
-    st_opts = "".join([f'<option value="{s["id"]}">{s["name"]}</option>' for s in stores])
-    admin_toggle_btn = f'''<button onclick="togglePasswords()" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1">👁️ <span id="toggle_pwd_txt">Ver Senhas (Admin)</span></button>''' if is_admin else ''
-
-    content = f"""
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="space-y-4">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-bold text-white">🏬 Lojas / Filiais</h2>
-                <button onclick="document.getElementById('add_store_box').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer">+ Nova Filial</button>
-            </div>
-            
-            <div id="add_store_box" class="bg-[#0b1329] border border-slate-800 p-4 rounded-2xl space-y-3">
-                <h4 class="text-xs font-bold text-sky-400 uppercase">+ Cadastrar Filial</h4>
-                <form action="/store-add" method="POST" class="space-y-2 text-xs font-bold">
-                    <input type="text" name="name" placeholder="Nome da Filial" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">
-                    <input type="password" name="password" placeholder="Senha de Acesso" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-mono">
-                    <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl cursor-pointer">Criar Loja</button>
-                </form>
-            </div>
-
-            <div class="bg-[#0b1329] border border-slate-800 rounded-2xl overflow-hidden">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-[#060b17] text-slate-400 font-bold"><tr><th class="p-3">ID</th><th class="p-3">Nome</th><th class="p-3">Senha</th><th class="p-3 text-center">Ações</th></tr></thead>
-                    <tbody>{"".join(s_rows)}</tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="space-y-4">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-bold text-white">👥 Funcionários & Operadores</h2>
-                <div class="flex items-center gap-2">
-                    {admin_toggle_btn}
-                    <button onclick="document.getElementById('add_user_box').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer">+ Novo Funcionário</button>
-                </div>
-            </div>
-
-            <div id="add_user_box" class="bg-[#0b1329] border border-slate-800 p-4 rounded-2xl space-y-3">
-                <h4 class="text-xs font-bold text-sky-400 uppercase">+ Cadastrar Funcionário</h4>
-                <form action="/user-add" method="POST" class="space-y-2 text-xs font-bold">
-                    <input type="text" name="name" placeholder="Nome Completo *" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="text" name="username" placeholder="Login *" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">
-                        <input type="password" name="password" placeholder="Senha *" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-mono">
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <select name="role" class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-sky-400 font-bold">
-                            <option value="VENDEDOR">VENDEDOR (Operador PDV)</option>
-                            <option value="ADMIN">ADMINISTRADOR (Acesso Total)</option>
-                        </select>
-                        <select name="store_id" class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">{st_opts}</select>
-                    </div>
-                    <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl cursor-pointer">Salvar Funcionário</button>
-                </form>
-            </div>
-
-            <div class="bg-[#0b1329] border border-slate-800 rounded-2xl overflow-hidden">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-[#060b17] text-slate-400 font-bold"><tr><th class="p-3">Nome</th><th class="p-3">Login</th><th class="p-3">Senha</th><th class="p-3">Cargo</th><th class="p-3">Loja</th><th class="p-3 text-center">Ações</th></tr></thead>
-                    <tbody>{"".join(u_rows)}</tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL DE EDIÇÃO DE LOJA -->
-    <div id="edit_store_modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div class="bg-[#0b1329] border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-3">
-            <h3 class="text-sm font-bold text-white">✏️ Editar Loja / Filial</h3>
-            <form action="/store-edit" method="POST" class="space-y-3 text-xs font-bold">
-                <input type="hidden" id="edit_s_id" name="id">
-                <div>
-                    <label class="block text-slate-300 mb-1">Nome da Filial</label>
-                    <input type="text" id="edit_s_name" name="name" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2.5 text-white">
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1">Senha de Acesso</label>
-                    <input type="password" id="edit_s_password" name="password" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="document.getElementById('edit_store_modal').classList.add('hidden')" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
-                    <button type="submit" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Salvar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL DE EDIÇÃO DE FUNCIONÁRIO -->
-    <div id="edit_user_modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div class="bg-[#0b1329] border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-3">
-            <h3 class="text-sm font-bold text-white">✏️ Editar Funcionário</h3>
-            <form action="/user-edit" method="POST" class="space-y-3 text-xs font-bold">
-                <input type="hidden" id="edit_u_id" name="id">
-                <div>
-                    <label class="block text-slate-300 mb-1">Nome Completo</label>
-                    <input type="text" id="edit_u_name" name="name" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2.5 text-white">
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1">Usuário / Login</label>
-                    <input type="text" id="edit_u_username" name="username" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2.5 text-white">
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1">Senha</label>
-                    <input type="password" id="edit_u_password" name="password" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-slate-300 mb-1">Cargo</label>
-                        <select id="edit_u_role" name="role" class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2 text-sky-400">
-                            <option value="VENDEDOR">VENDEDOR</option>
-                            <option value="ADMIN">ADMIN</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-slate-300 mb-1">Loja</label>
-                        <select id="edit_u_store_id" name="store_id" class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-2 text-white">{st_opts}</select>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="document.getElementById('edit_user_modal').classList.add('hidden')" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
-                    <button type="submit" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Salvar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-    function openEditStoreModal(s) {{
-        document.getElementById('edit_s_id').value = s.id;
-        document.getElementById('edit_s_name').value = s.name;
-        document.getElementById('edit_s_password').value = s.password;
-        document.getElementById('edit_store_modal').classList.remove('hidden');
-    }}
-    function openEditUserModal(u) {{
-        document.getElementById('edit_u_id').value = u.id;
-        document.getElementById('edit_u_name').value = u.name;
-        document.getElementById('edit_u_username').value = u.username;
-        document.getElementById('edit_u_password').value = u.password;
-        document.getElementById('edit_u_role').value = u.role;
-        document.getElementById('edit_u_store_id').value = u.store_id;
-        document.getElementById('edit_user_modal').classList.remove('hidden');
-    }}
-    let passwordsRevealed = false;
-    function togglePasswords() {{
-        passwordsRevealed = !passwordsRevealed;
-        const vals = document.querySelectorAll('.pwd-val');
-        const dots = document.querySelectorAll('.pwd-dots');
-        const txt = document.getElementById('toggle_pwd_txt');
-        vals.forEach(el => el.classList.toggle('hidden', !passwordsRevealed));
-        dots.forEach(el => el.classList.toggle('hidden', passwordsRevealed));
-        if (txt) {{
-            txt.innerText = passwordsRevealed ? 'Ocultar Senhas' : 'Ver Senhas (Admin)';
-        }}
-    }}
-    </script>
-    """
-    return render_layout(request, content, "Lojas & Equipe", "stores_users", msg)
-
-@app.post("/store-add")
-def store_add(name: str = Form(...), password: str = Form(...)):
-    conn = get_db()
-    conn.execute("INSERT INTO stores (name, password, logo_text) VALUES (?, ?, ?)", (name, password, f"CERBERUS {name.upper()}"))
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url="/stores-users?msg=Loja+criada+com+sucesso!", status_code=303)
-
-@app.post("/store-edit")
-def store_edit(id: int = Form(...), name: str = Form(...), password: str = Form(...)):
-    conn = get_db()
-    conn.execute("UPDATE stores SET name = ?, password = ? WHERE id = ?", (name, password, id))
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url="/stores-users?msg=Loja+atualizada+com+sucesso!", status_code=303)
-
-@app.post("/store-delete")
-def store_delete(id: int = Form(...)):
-    if id == 1:
-        return RedirectResponse(url="/stores-users?msg=A+Matriz+Principal+nao+pode+ser+excluida!", status_code=303)
-    conn = get_db()
-    conn.execute("DELETE FROM stores WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url="/stores-users?msg=Loja+excluida+com+sucesso!", status_code=303)
-
-@app.post("/user-add")
-def user_add(name: str = Form(...), username: str = Form(...), password: str = Form(...), role: str = Form("VENDEDOR"), store_id: int = Form(1)):
-    conn = get_db()
-    try:
-        conn.execute("INSERT INTO users (name, username, password_hash, role, store_id) VALUES (?, ?, ?, ?, ?)", (name, username, password, role, store_id))
-        conn.commit()
-        msg = "Funcionario+cadastrado+com+sucesso!"
-    except Exception:
-        msg = "Erro:+Nome+de+usuario+ja+em+uso!"
-    conn.close()
-    return RedirectResponse(url=f"/stores-users?msg={msg}", status_code=303)
-
-@app.post("/user-edit")
-def user_edit(id: int = Form(...), name: str = Form(...), username: str = Form(...), password: str = Form(...), role: str = Form("VENDEDOR"), store_id: int = Form(1)):
-    conn = get_db()
-    conn.execute("UPDATE users SET name = ?, username = ?, password_hash = ?, role = ?, store_id = ? WHERE id = ?",
-        (name, username, password, role, store_id, id))
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url="/stores-users?msg=Funcionario+atualizado+com+sucesso!", status_code=303)
-
-@app.post("/user-delete")
-def user_delete(id: int = Form(...)):
-    conn = get_db()
-    u = conn.execute("SELECT username FROM users WHERE id = ?", (id,)).fetchone()
-    if u and u["username"] == "admin":
-        conn.close()
-        return RedirectResponse(url="/stores-users?msg=O+administrador+principal+nao+pode+ser+excluido!", status_code=303)
-    conn.execute("DELETE FROM users WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url="/stores-users?msg=Funcionario+excluido+com+sucesso!", status_code=303)
-
-# ==========================================
-# 8. FRENTE DE CAIXA / PDV
+# 7. FRENTE DE CAIXA / PDV
 # ==========================================
 @app.get("/pdv", response_class=HTMLResponse)
 def pdv(request: Request, msg: str = ""):
@@ -1384,7 +1205,7 @@ def delete_sale(request: Request, id: int = Form(...)):
     return RedirectResponse(url="/dashboard?msg=Venda+excluida+e+estoque+estornado+com+sucesso!", status_code=303)
 
 # ==========================================
-# 9. CONTAS A RECEBER & COBRANÇAS WHATSAPP
+# 8. CONTAS A RECEBER & COBRANÇAS WHATSAPP
 # ==========================================
 @app.get("/receivables", response_class=HTMLResponse)
 def receivables_page(request: Request, msg: str = ""):
@@ -1497,7 +1318,7 @@ def receivable_delete(id: int = Form(...)):
     return RedirectResponse(url="/receivables?msg=Lancamento+excluido!", status_code=303)
 
 # ==========================================
-# 10. DESPESAS, FORNECEDORES, IMPORTAÇÃO & RELATÓRIOS
+# 9. DESPESAS, FORNECEDORES & RELATÓRIOS
 # ==========================================
 @app.get("/expenses", response_class=HTMLResponse)
 def expenses_page(request: Request, msg: str = ""):
@@ -1767,6 +1588,203 @@ def import_customers_batch(request: Request, raw_data: str = Form(...)):
     conn.commit()
     conn.close()
     return RedirectResponse(url=f"/customers?msg={count}+clientes+importados+com+sucesso!", status_code=303)
+
+# ==========================================
+# 10. GESTÃO DE LOJAS & FUNCIONÁRIOS (ADMIN ONLY)
+# ==========================================
+@app.get("/stores-users", response_class=HTMLResponse)
+def stores_users_page(request: Request, msg: str = ""):
+    user = get_user(request)
+    if not user:
+        return RedirectResponse(url="/login?msg=Por+favor,+faca+login+para+acessar", status_code=303)
+    
+    if user.get("role") != "ADMIN":
+        return RedirectResponse(url="/dashboard?msg=Acesso+restrito+a+administradores!", status_code=303)
+
+    conn = get_db()
+    stores = conn.execute("SELECT * FROM stores ORDER BY id ASC").fetchall()
+    users_list = conn.execute("""
+        SELECT u.*, s.name as store_name 
+        FROM users u 
+        LEFT JOIN stores s ON u.store_id = s.id 
+        ORDER BY u.id ASC
+    """).fetchall()
+    conn.close()
+
+    store_options = "".join([f'<option value="{s["id"]}">🏢 {s["name"]}</option>' for s in stores])
+
+    store_rows = "".join([f"""<tr class="border-b border-slate-800 text-xs">
+        <td class="p-3 font-bold text-white">#{s['id']}</td>
+        <td class="p-3 font-bold text-sky-400">🏢 {s['name']}</td>
+        <td class="p-3 text-slate-300">{s['city'] or 'Matriz'}</td>
+        <td class="p-3 font-mono text-emerald-400 font-bold">🔒 {s['password'] or '1234'}</td>
+        <td class="p-3 text-center">
+            <button onclick="editStore({s['id']}, '{s['name']}', '{s['password'] or '1234'}')" class="text-xs bg-sky-950/60 hover:bg-sky-600 text-sky-300 px-2.5 py-1 rounded cursor-pointer">✏️ Alterar Senha</button>
+        </td>
+    </tr>""" for s in stores])
+
+    user_rows = "".join([f"""<tr class="border-b border-slate-800 text-xs">
+        <td class="p-3 font-bold text-white">{u['name']}</td>
+        <td class="p-3 font-mono text-slate-300">@{u['username']}</td>
+        <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold {'bg-blue-500/20 text-blue-300 border border-blue-500/30' if u['role'] == 'ADMIN' else 'bg-slate-800 text-slate-300'}">{u['role']}</span></td>
+        <td class="p-3 text-sky-400 font-bold">🏢 {u['store_name'] or 'Todas (Admin)'}</td>
+        <td class="p-3 font-mono text-slate-400">{'••••••' if u['role'] == 'ADMIN' and user['id'] != u['id'] else u['password_hash']}</td>
+        <td class="p-3 text-center">
+            <form action="/user-delete" method="POST" class="inline" onsubmit="return confirm('Excluir usuário?')">
+                <input type="hidden" name="id" value="{u['id']}">
+                <button type="submit" class="text-xs bg-rose-950/60 hover:bg-rose-600 text-rose-300 px-2 py-1 rounded cursor-pointer" {'disabled' if u['username'] == 'admin' else ''}>🗑️</button>
+            </form>
+        </td>
+    </tr>""" for u in users_list])
+
+    content = f"""
+    <div class="space-y-6">
+        <div>
+            <h2 class="text-xl font-bold text-white">⚙️ Gestão de Lojas, Filiais e Funcionários</h2>
+            <p class="text-xs text-slate-400">Controle de senhas das lojas e vinculação de funcionários exclusivos por filial</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="bg-[#0b1329] border border-slate-800 p-6 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold text-sky-400 uppercase">+ Cadastrar Nova Filial / Loja</h3>
+                    <form action="/store-add" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
+                        <input type="text" name="name" placeholder="Nome da Loja *" required class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">
+                        <input type="text" name="city" placeholder="Cidade / Bairro" class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">
+                        <input type="password" name="password" placeholder="Senha da Loja *" required class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-mono">
+                        <button type="submit" class="sm:col-span-3 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl cursor-pointer">Salvar Loja</button>
+                    </form>
+                </div>
+
+                <div class="bg-[#0b1329] border border-slate-800 rounded-2xl overflow-hidden">
+                    <div class="p-3 bg-[#060b17] border-b border-slate-800 font-bold text-xs text-white">🏢 Lojas & Senhas de Acesso</div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-[#060b17] text-slate-400 border-b border-slate-800 font-bold">
+                            <tr><th class="p-3">ID</th><th class="p-3">Loja</th><th class="p-3">Cidade</th><th class="p-3">Senha</th><th class="p-3 text-center">Ação</th></tr>
+                        </thead>
+                        <tbody>{store_rows}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-[#0b1329] border border-slate-800 p-6 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold text-sky-400 uppercase">+ Cadastrar Funcionário / Vendedor</h3>
+                    <form action="/user-add" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+                        <input type="text" name="name" placeholder="Nome Completo *" required class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white sm:col-span-2">
+                        <input type="text" name="username" placeholder="Login / Usuário *" required class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white">
+                        <input type="password" name="password" placeholder="Senha do Usuário *" required class="bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-mono">
+                        <div>
+                            <label class="block text-slate-400 mb-1">Loja de Atuação:</label>
+                            <select name="store_id" class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-sky-300 font-bold cursor-pointer">
+                                {store_options}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Perfil de Acesso:</label>
+                            <select name="role" class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-bold cursor-pointer">
+                                <option value="VENDEDOR">Vendedor / Operador (Preso à loja)</option>
+                                <option value="ADMIN">Administrador (Acesso total)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="sm:col-span-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl cursor-pointer">Cadastrar Funcionário</button>
+                    </form>
+                </div>
+
+                <div class="bg-[#0b1329] border border-slate-800 rounded-2xl overflow-hidden">
+                    <div class="p-3 bg-[#060b17] border-b border-slate-800 font-bold text-xs text-white">👥 Usuários & Vínculos de Loja</div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-[#060b17] text-slate-400 border-b border-slate-800 font-bold">
+                            <tr><th class="p-3">Nome</th><th class="p-3">Login</th><th class="p-3">Cargo</th><th class="p-3">Loja</th><th class="p-3">Senha</th><th class="p-3 text-center">Ação</th></tr>
+                        </thead>
+                        <tbody>{user_rows}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR SENHA DA LOJA -->
+    <div id="edit_store_modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+        <div class="bg-[#0b1329] border border-slate-700 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 class="text-sm font-bold text-white">🔒 Alterar Senha da Loja</h3>
+            <form action="/store-update-password" method="POST" class="space-y-3 text-xs font-bold">
+                <input type="hidden" id="edit_store_id" name="id">
+                <div>
+                    <label class="block text-slate-400 mb-1">Nome da Loja:</label>
+                    <input type="text" id="edit_store_name" readonly class="w-full bg-[#060b17] border border-slate-800 rounded-xl p-3 text-slate-400">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">Nova Senha da Loja:</label>
+                    <input type="password" id="edit_store_password" name="password" required class="w-full bg-[#060b17] border border-slate-700 rounded-xl p-3 text-white font-mono">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="document.getElementById('edit_store_modal').classList.add('hidden')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl cursor-pointer">Salvar Nova Senha</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function editStore(id, name, pass) {
+        document.getElementById('edit_store_id').value = id;
+        document.getElementById('edit_store_name').value = name;
+        document.getElementById('edit_store_password').value = pass;
+        document.getElementById('edit_store_modal').classList.remove('hidden');
+    }
+    </script>
+    """
+    return render_layout(request, content, "Lojas & Funcionários", "stores_users", msg)
+
+@app.post("/store-add")
+def store_add(request: Request, name: str = Form(...), city: str = Form(""), password: str = Form("1234")):
+    user = get_user(request)
+    if not user or user.get("role") != "ADMIN":
+        return RedirectResponse(url="/dashboard?msg=Acesso+negado", status_code=303)
+    conn = get_db()
+    conn.execute("INSERT INTO stores (name, city, password) VALUES (?, ?, ?)", (name.strip(), city.strip(), password.strip()))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url="/stores-users?msg=Loja+cadastrada+com+sucesso!", status_code=303)
+
+@app.post("/store-update-password")
+def store_update_password(request: Request, id: int = Form(...), password: str = Form(...)):
+    user = get_user(request)
+    if not user or user.get("role") != "ADMIN":
+        return RedirectResponse(url="/dashboard?msg=Acesso+negado", status_code=303)
+    conn = get_db()
+    conn.execute("UPDATE stores SET password = ? WHERE id = ?", (password.strip(), id))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url="/stores-users?msg=Senha+da+loja+atualizada+com+sucesso!", status_code=303)
+
+@app.post("/user-add")
+def user_add(request: Request, name: str = Form(...), username: str = Form(...), password: str = Form(...), store_id: int = Form(1), role: str = Form("VENDEDOR")):
+    user = get_user(request)
+    if not user or user.get("role") != "ADMIN":
+        return RedirectResponse(url="/dashboard?msg=Acesso+negado", status_code=303)
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO users (name, username, password_hash, role, store_id) VALUES (?, ?, ?, ?, ?)",
+                     (name.strip(), username.strip(), password.strip(), role.strip(), store_id))
+        conn.commit()
+        msg = "Funcionario+cadastrado+com+sucesso!"
+    except Exception:
+        msg = "Erro+ao+cadastrar:+login+ja+existente+ou+invalido."
+    conn.close()
+    return RedirectResponse(url=f"/stores-users?msg={msg}", status_code=303)
+
+@app.post("/user-delete")
+def user_delete(request: Request, id: int = Form(...)):
+    user = get_user(request)
+    if not user or user.get("role") != "ADMIN":
+        return RedirectResponse(url="/dashboard?msg=Acesso+negado", status_code=303)
+    conn = get_db()
+    conn.execute("DELETE FROM users WHERE id = ? AND username != 'admin'", (id,))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url="/stores-users?msg=Funcionario+removido!", status_code=303)
 
 # ==========================================
 # 11. INICIALIZAÇÃO SERVIDOR
